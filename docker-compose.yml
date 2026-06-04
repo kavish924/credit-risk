@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+  mlflow:
+    image: python:3.12-slim
+    container_name: mlflow-server
+    command: >
+      bash -c "pip install mlflow && mlflow server
+      --backend-store-uri sqlite:///mlflow.db
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0 --port 5000"
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: credit-risk-api
+    ports:
+      - "8000:8000"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - APP_ENV=production
+      - MODEL_PATH=models/
+      - DATA_PATH=data/
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./monitoring/reports:/app/monitoring/reports
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  mlflow_data:

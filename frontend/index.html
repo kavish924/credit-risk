@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Credit Risk Predictor — MLOps Dashboard</title>
+  <meta name="description"
+    content="Predict loan default probability using an XGBoost ML model. Enter applicant details and get instant risk assessment." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+
+<body>
+
+  <div class="bg-blobs" aria-hidden="true">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+
+  <header id="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+        </div>
+        <div>
+          <h1>Credit Risk Predictor</h1>
+          <span class="subtitle">MLOps · XGBoost · Real-time Inference</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div id="api-status" class="status-badge status-checking">
+          <span class="status-dot"></span>
+          <span class="status-text">Checking…</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main id="app-main">
+
+    <section class="card form-card" id="form-section">
+      <div class="card-header">
+        <h2>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" class="section-icon">
+            <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+            <circle cx="8.5" cy="7" r="4" />
+            <line x1="20" y1="8" x2="20" y2="14" />
+            <line x1="23" y1="11" x2="17" y2="11" />
+          </svg>
+          Applicant Details
+        </h2>
+        <p class="card-subtitle">Fill in the loan application data below</p>
+      </div>
+
+      <form id="predict-form" autocomplete="off">
+
+        <fieldset>
+          <legend>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" class="legend-icon">
+              <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+              <line x1="1" y1="10" x2="23" y2="10" />
+            </svg>
+            Loan Information
+          </legend>
+          <div class="form-grid">
+            <div class="form-group" id="group-contract-type">
+              <label for="input-contract-type">Contract Type</label>
+              <select id="input-contract-type" name="NAME_CONTRACT_TYPE">
+                <option value="Cash loans">Cash Loans</option>
+                <option value="Revolving loans">Revolving Loans</option>
+              </select>
+            </div>
+            <div class="form-group" id="group-credit">
+              <label for="input-credit">Credit Amount <span class="required">*</span></label>
+              <div class="input-with-prefix">
+                <span class="input-prefix">₹</span>
+                <input type="number" id="input-credit" name="AMT_CREDIT" min="1" step="any" required
+                  placeholder="e.g. 540000" />
+              </div>
+            </div>
+            <div class="form-group" id="group-annuity">
+              <label for="input-annuity">Annuity Amount</label>
+              <div class="input-with-prefix">
+                <span class="input-prefix">₹</span>
+                <input type="number" id="input-annuity" name="AMT_ANNUITY" min="0" step="any"
+                  placeholder="e.g. 26000" />
+              </div>
+            </div>
+            <div class="form-group" id="group-goods-price">
+              <label for="input-goods-price">Goods Price</label>
+              <div class="input-with-prefix">
+                <span class="input-prefix">₹</span>
+                <input type="number" id="input-goods-price" name="AMT_GOODS_PRICE" min="0" step="any"
+                  placeholder="e.g. 450000" />
+              </div>
+            </div>
+          </div>
+        </fieldset>
+
+
+        <fieldset>
+          <legend>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" class="legend-icon">
+              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            Applicant Demographics
+          </legend>
+          <div class="form-grid">
+            <div class="form-group" id="group-income">
+              <label for="input-income">Annual Income <span class="required">*</span></label>
+              <div class="input-with-prefix">
+                <span class="input-prefix">₹</span>
+                <input type="number" id="input-income" name="AMT_INCOME_TOTAL" min="1" step="any" required
+                  placeholder="e.g. 135000" />
+              </div>
+            </div>
+            <div class="form-group" id="group-age">
+              <label for="input-age">Age (years) <span class="required">*</span></label>
+              <input type="number" id="input-age" min="18" max="100" step="1" required placeholder="e.g. 33" />
+              <span class="helper-text">Converted to DAYS_BIRTH internally</span>
+            </div>
+            <div class="form-group" id="group-gender">
+              <label for="input-gender">Gender</label>
+              <select id="input-gender" name="CODE_GENDER">
+                <option value="M">Male</option>
+                <option value="F">Female</option>
+                <option value="XNA">Other / Prefer not to say</option>
+              </select>
+            </div>
+            <div class="form-group" id="group-employment">
+              <label for="input-employment">Employment (years)</label>
+              <input type="number" id="input-employment" min="0" max="70" step="0.5" placeholder="e.g. 8" />
+              <span class="helper-text">Converted to DAYS_EMPLOYED internally</span>
+            </div>
+            <div class="form-group" id="group-children">
+              <label for="input-children">Number of Children</label>
+              <input type="number" id="input-children" name="CNT_CHILDREN" min="0" step="1" value="0" />
+            </div>
+            <div class="form-group" id="group-family">
+              <label for="input-family">Family Members</label>
+              <input type="number" id="input-family" name="CNT_FAM_MEMBERS" min="1" step="1" value="1" />
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" class="legend-icon">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+            Assets &amp; Flags
+          </legend>
+          <div class="form-grid form-grid-toggles">
+            <div class="form-group toggle-group" id="group-own-car">
+              <label>Owns a Car?</label>
+              <div class="toggle-buttons" role="radiogroup" aria-label="Owns a car">
+                <button type="button" class="toggle-btn active" data-name="FLAG_OWN_CAR" data-value="N">No</button>
+                <button type="button" class="toggle-btn" data-name="FLAG_OWN_CAR" data-value="Y">Yes</button>
+              </div>
+            </div>
+            <div class="form-group toggle-group" id="group-own-realty">
+              <label>Owns Real Estate?</label>
+              <div class="toggle-buttons" role="radiogroup" aria-label="Owns real estate">
+                <button type="button" class="toggle-btn active" data-name="FLAG_OWN_REALTY" data-value="N">No</button>
+                <button type="button" class="toggle-btn" data-name="FLAG_OWN_REALTY" data-value="Y">Yes</button>
+              </div>
+            </div>
+            <div class="form-group toggle-group" id="group-live-work-city">
+              <label>Lives in Work City?</label>
+              <div class="toggle-buttons" role="radiogroup" aria-label="Lives in work city">
+                <button type="button" class="toggle-btn" data-name="LIVE_CITY_NOT_WORK_CITY" data-value="1">No</button>
+                <button type="button" class="toggle-btn active" data-name="LIVE_CITY_NOT_WORK_CITY"
+                  data-value="0">Yes</button>
+              </div>
+            </div>
+          </div>
+        </fieldset>
+
+
+        <fieldset>
+          <legend>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" class="legend-icon">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            Additional Details
+          </legend>
+          <div class="form-grid">
+            <div class="form-group" id="group-region-pop">
+              <label for="input-region-pop">Region Population (relative)</label>
+              <input type="number" id="input-region-pop" name="REGION_POPULATION_RELATIVE" min="0" max="1" step="0.001"
+                placeholder="e.g. 0.035" />
+              <span class="helper-text">Between 0 and 1</span>
+            </div>
+            <div class="form-group" id="group-days-reg">
+              <label for="input-days-reg">Days Since Registration</label>
+              <input type="number" id="input-days-reg" name="DAYS_REGISTRATION" step="any" placeholder="e.g. -5000" />
+              <span class="helper-text">Negative value (days in the past)</span>
+            </div>
+            <div class="form-group" id="group-days-id">
+              <label for="input-days-id">Days Since ID Published</label>
+              <input type="number" id="input-days-id" name="DAYS_ID_PUBLISH" step="1" placeholder="e.g. -3000" />
+              <span class="helper-text">Negative value (days in the past)</span>
+            </div>
+          </div>
+        </fieldset>
+
+
+        <div class="form-actions">
+          <button type="reset" class="btn btn-secondary" id="btn-reset">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <polyline points="1 4 1 10 7 10" />
+              <path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
+            </svg>
+            Reset
+          </button>
+          <button type="submit" class="btn btn-primary" id="btn-predict">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </svg>
+            Predict Risk
+            <span class="spinner" id="btn-spinner"></span>
+          </button>
+        </div>
+      </form>
+    </section>
+
+
+    <section class="card results-card" id="results-section">
+
+      <div class="results-placeholder" id="results-placeholder">
+        <div class="placeholder-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+        </div>
+        <h3>Awaiting Prediction</h3>
+        <p>Enter applicant details on the left and click <strong>Predict Risk</strong> to get an instant credit risk
+          assessment.</p>
+      </div>
+
+
+      <div class="results-content hidden" id="results-content">
+        <div class="card-header">
+          <h2>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" class="section-icon">
+              <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+            Risk Assessment
+          </h2>
+        </div>
+
+
+        <div class="gauge-container" id="gauge-container">
+          <svg class="gauge-svg" viewBox="0 0 200 120" id="gauge-svg">
+            <defs>
+              <linearGradient id="gauge-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#10b981" />
+                <stop offset="50%" stop-color="#f59e0b" />
+                <stop offset="100%" stop-color="#ef4444" />
+              </linearGradient>
+            </defs>
+
+            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="12"
+              stroke-linecap="round" />
+            <!-- Colored arc -->
+            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#gauge-gradient)" stroke-width="12"
+              stroke-linecap="round" id="gauge-arc" />
+            <!-- Needle -->
+            <line x1="100" y1="100" x2="100" y2="30" stroke="white" stroke-width="2.5" stroke-linecap="round"
+              id="gauge-needle" class="gauge-needle" />
+            <circle cx="100" cy="100" r="6" fill="white" />
+          </svg>
+          <div class="gauge-value" id="gauge-value">—</div>
+          <div class="gauge-label" id="gauge-label">Risk Score</div>
+        </div>
+
+        <!-- Key Metrics -->
+        <div class="metrics-grid" id="metrics-grid">
+          <div class="metric-card" id="metric-probability">
+            <span class="metric-title">Default Probability</span>
+            <span class="metric-value" id="val-probability">—</span>
+          </div>
+          <div class="metric-card" id="metric-risk-label">
+            <span class="metric-title">Risk Level</span>
+            <span class="metric-value risk-badge" id="val-risk-label">—</span>
+          </div>
+          <div class="metric-card" id="metric-score">
+            <span class="metric-title">Credit Score</span>
+            <span class="metric-value" id="val-score">—</span>
+            <span class="metric-sub">out of 1000</span>
+          </div>
+          <div class="metric-card" id="metric-model">
+            <span class="metric-title">Model</span>
+            <span class="metric-value" id="val-model">—</span>
+            <span class="metric-sub" id="val-model-version">—</span>
+          </div>
+        </div>
+
+        <!-- Interpretation -->
+        <div class="interpretation-box" id="interpretation-box">
+          <h4 id="interpretation-title">Interpretation</h4>
+          <p id="interpretation-text"></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ── Toast Notifications ─────────────────────────────────────── -->
+  <div id="toast-container" aria-live="polite"></div>
+
+  <!-- ── Footer ──────────────────────────────────────────────────── -->
+  <footer id="app-footer">
+    <p>Credit Risk Predictor · MLOps Pipeline · Built with FastAPI &amp; XGBoost</p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+
+</html>
