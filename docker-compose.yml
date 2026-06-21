@@ -1,32 +1,57 @@
-version: "3.9"
-
 services:
+  # ── PostgreSQL — MLflow backend store ────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: mlflow-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mlflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mlflow_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-mlflow_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mlflow} -d ${POSTGRES_DB:-mlflow_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── MLflow Tracking Server ───────────────────────────────────────
   mlflow:
-    image: python:3.12-slim
+    build:
+      context: .
+      dockerfile: Dockerfile.mlflow
     container_name: mlflow-server
     command: >
-      bash -c "pip install mlflow && mlflow server
-      --backend-store-uri sqlite:///mlflow.db
+      mlflow server
+      --backend-store-uri postgresql://${POSTGRES_USER:-mlflow}:${POSTGRES_PASSWORD:-mlflow_secret}@postgres:5432/${POSTGRES_DB:-mlflow_db}
       --default-artifact-root /mlflow/artifacts
-      --host 0.0.0.0 --port 5000"
+      --host 0.0.0.0 --port 5000
     ports:
       - "5000:5000"
     volumes:
       - mlflow_data:/mlflow
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 5s
       retries: 5
+      start_period: 60s
 
-  
+  # ── Credit Risk API ─────────────────────────────────────────────
   api:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: credit-risk-api
     ports:
-      - "8000:8000"
+      - "8001:8001"
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
       - APP_ENV=production
@@ -40,10 +65,49 @@ services:
       mlflow:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
 
+  # ── Apache Airflow (Standalone) ─────────────────────────────────
+  airflow:
+    image: apache/airflow:2.9.3-python3.12
+    container_name: airflow-scheduler
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER:-mlflow}:${POSTGRES_PASSWORD:-mlflow_secret}@postgres:5432/airflow_db
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-}
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+      - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=false
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - DATA_PATH=data/
+      - MODEL_PATH=models/
+      - _AIRFLOW_DB_MIGRATE=true
+      - _AIRFLOW_WWW_USER_CREATE=true
+      - _AIRFLOW_WWW_USER_USERNAME=${AIRFLOW_USER:-admin}
+      - _AIRFLOW_WWW_USER_PASSWORD=${AIRFLOW_PASSWORD:-admin}
+    command: standalone
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./src:/opt/airflow/src
+      - ./monitoring:/opt/airflow/monitoring
+      - ./data:/opt/airflow/data
+      - ./models:/opt/airflow/models
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
 volumes:
+  postgres_data:
   mlflow_data:

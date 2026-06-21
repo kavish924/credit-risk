@@ -1,5 +1,3 @@
-
-
 import sys
 from pathlib import Path
 
@@ -10,27 +8,27 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.data.preprocessing import engineer_features, run_preprocessing, MISSING_THRESHOLD
-
-
+from src.data.preprocessing import engineer_features, run_preprocessing
 
 
 @pytest.fixture
 def minimal_df():
     """Minimal DataFrame mimicking the Home Credit dataset structure."""
-    return pd.DataFrame({
-        "SK_ID_CURR": [100001, 100002, 100003],
-        "TARGET": [0, 1, 0],
-        "AMT_CREDIT": [500_000, 250_000, 750_000],
-        "AMT_INCOME_TOTAL": [100_000, 50_000, 200_000],
-        "AMT_ANNUITY": [25_000, 12_500, 37_500],
-        "DAYS_BIRTH": [-12_000, -15_000, -10_000],
-        "DAYS_EMPLOYED": [-3_000, -1_000, -5_000],
-        "NAME_CONTRACT_TYPE": ["Cash loans", "Revolving loans", "Cash loans"],
-        "CODE_GENDER": ["M", "F", "M"],
-        "FLAG_OWN_CAR": ["Y", "N", "Y"],
-        "FLAG_OWN_REALTY": ["Y", "Y", "N"],
-    })
+    return pd.DataFrame(
+        {
+            "SK_ID_CURR": [100001, 100002, 100003],
+            "TARGET": [0, 1, 0],
+            "AMT_CREDIT": [500_000, 250_000, 750_000],
+            "AMT_INCOME_TOTAL": [100_000, 50_000, 200_000],
+            "AMT_ANNUITY": [25_000, 12_500, 37_500],
+            "DAYS_BIRTH": [-12_000, -15_000, -10_000],
+            "DAYS_EMPLOYED": [-3_000, -1_000, -5_000],
+            "NAME_CONTRACT_TYPE": ["Cash loans", "Revolving loans", "Cash loans"],
+            "CODE_GENDER": ["M", "F", "M"],
+            "FLAG_OWN_CAR": ["Y", "N", "Y"],
+            "FLAG_OWN_REALTY": ["Y", "Y", "N"],
+        }
+    )
 
 
 @pytest.fixture
@@ -41,10 +39,7 @@ def high_missing_df(minimal_df):
     return df
 
 
-
-
 class TestFeatureEngineering:
-
     def test_debt_to_income_created(self, minimal_df):
         result = engineer_features(minimal_df)
         assert "DEBT_TO_INCOME" in result.columns
@@ -72,7 +67,7 @@ class TestFeatureEngineering:
         df.loc[0, "DAYS_EMPLOYED"] = 365243  # anomalous positive value
         result = engineer_features(df)
         assert "DAYS_EMPLOYED_ANOMALY" in result.columns
-    
+
         assert result["DAYS_EMPLOYED_ANOMALY"].iloc[0] == 1
 
     def test_no_inf_values(self, minimal_df):
@@ -81,10 +76,7 @@ class TestFeatureEngineering:
         assert not np.isinf(result[numeric_cols].values).any()
 
 
-
-
 class TestPreprocessingPipeline:
-
     def test_output_shape_is_2d(self, minimal_df):
         X, y, _, _ = run_preprocessing(minimal_df, fit=True)
         assert X.ndim == 2

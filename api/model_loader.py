@@ -1,6 +1,4 @@
-
 import logging
-import os
 import sys
 from pathlib import Path
 
@@ -21,18 +19,16 @@ PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 PREPROCESSOR_PATH = PROCESSED_DIR / "preprocessor.pkl"
 
 REGISTERED_MODEL_NAME = "credit-risk-model"
-MODEL_STAGE = "Production"  
+MODEL_STAGE = "Production"
 
 
 class ModelWrapper:
-
     def __init__(self, model, version: str, name: str, preprocessor=None):
         self.model = model
         self.version = version
         self.name = name
         self.preprocessor = preprocessor
 
-        
         self._num_cols = []
         self._cat_cols = []
         if preprocessor is not None:
@@ -42,8 +38,7 @@ class ModelWrapper:
                 elif name_t == "cat":
                     self._cat_cols = list(cols)
             logger.info(
-                f"Preprocessor expects {len(self._num_cols)} numeric + "
-                f"{len(self._cat_cols)} categorical columns"
+                f"Preprocessor expects {len(self._num_cols)} numeric + " f"{len(self._cat_cols)} categorical columns"
             )
 
     def _align_columns(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -73,17 +68,15 @@ def _load_preprocessor():
 
 
 def load_from_mlflow() -> ModelWrapper:
-    import mlflow  
+    import mlflow
 
     tracking_uri = MLFLOW_URI or "http://127.0.0.1:5000"
     mlflow.set_tracking_uri(tracking_uri)
     client = mlflow.tracking.MlflowClient()
 
-
     versions = client.search_model_versions(f"name='{REGISTERED_MODEL_NAME}'")
     champion = next(
-        (v for v in sorted(versions, key=lambda v: int(v.version), reverse=True)
-         if v.tags.get("champion") == "true"),
+        (v for v in sorted(versions, key=lambda v: int(v.version), reverse=True) if v.tags.get("champion") == "true"),
         None,
     )
 
@@ -106,10 +99,7 @@ def load_from_mlflow() -> ModelWrapper:
 
 def load_from_local() -> ModelWrapper:
     if not LOCAL_MODEL_PATH.exists():
-        raise FileNotFoundError(
-            f"Local model not found at {LOCAL_MODEL_PATH}. "
-            "Run: python -m src.ml.train"
-        )
+        raise FileNotFoundError(f"Local model not found at {LOCAL_MODEL_PATH}. " "Run: python -m src.ml.train")
     raw = joblib.load(LOCAL_MODEL_PATH)
 
     if isinstance(raw, dict) and "model" in raw:

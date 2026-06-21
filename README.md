@@ -31,7 +31,7 @@ But it doesn't stop at just building a model — it implements the **full MLOps 
 - ✅ Docker containerization
 - ✅ Airflow DAG for weekly retraining
 
----
+
 
 ## 🏗️ Project Architecture
 
@@ -215,7 +215,7 @@ Create a `.env` file in the project root (or edit the existing one):
 
 ```env
 APP_ENV=development
-PORT=8000
+PORT=8001
 DATA_PATH=data/
 MODEL_PATH=models/
 MLFLOW_TRACKING_URI=http://127.0.0.1:5000
@@ -287,17 +287,17 @@ python -m src.ml.evaluate
 ### Step 9: Start the API Server
 
 ```bash
-uvicorn api.app:app --reload --host 0.0.0.0 --port 8000
+uvicorn api.app:app --reload --host 0.0.0.0 --port 8001
 ```
 
 The API is now running! Open your browser and go to:
 
 | URL | What you'll see |
 |-----|-----------------|
-| http://localhost:8000 | 🖥️ **Web Dashboard** — Enter applicant details and get predictions |
-| http://localhost:8000/docs | 📄 **Swagger UI** — Interactive API documentation |
-| http://localhost:8000/health | 💚 Health check endpoint |
-| http://localhost:8000/metrics | 📊 Prometheus metrics |
+| http://localhost:8001 | 🖥️ **Web Dashboard** — Enter applicant details and get predictions |
+| http://localhost:8001/docs | 📄 **Swagger UI** — Interactive API documentation |
+| http://localhost:8001/health | 💚 Health check endpoint |
+| http://localhost:8001/metrics | 📊 Prometheus metrics |
 
 ---
 
@@ -305,7 +305,7 @@ The API is now running! Open your browser and go to:
 
 #### Option A: Use the Web Dashboard
 
-Open http://localhost:8000 in your browser. Fill in the form with applicant details and click **"Predict Risk"**. You'll see:
+Open http://localhost:8001 in your browser. Fill in the form with applicant details and click **"Predict Risk"**. You'll see:
 - **Default Probability** (e.g., 0.15 = 15% chance of default)
 - **Risk Label** (LOW / MEDIUM / HIGH)
 - **Risk Score** (0–1000, higher = safer)
@@ -313,7 +313,7 @@ Open http://localhost:8000 in your browser. Fill in the form with applicant deta
 #### Option B: Use the API Directly
 
 ```bash
-curl -X POST http://localhost:8000/predict \
+curl -X POST http://localhost:8001/predict \
   -H "Content-Type: application/json" \
   -d '{
     "AMT_CREDIT": 540000,
@@ -342,7 +342,7 @@ curl -X POST http://localhost:8000/predict \
 #### Option C: Batch Predictions (up to 100 at once)
 
 ```bash
-curl -X POST http://localhost:8000/predict/batch \
+curl -X POST http://localhost:8001/predict/batch \
   -H "Content-Type: application/json" \
   -d '{
     "applications": [
@@ -366,14 +366,14 @@ docker-compose up --build
 
 | Service | URL | Description |
 |---------|-----|-------------|
-| Credit Risk API | http://localhost:8000 | Prediction API + Dashboard |
+| Credit Risk API | http://localhost:8001 | Prediction API + Dashboard |
 | MLflow UI | http://localhost:5000 | Experiment tracking dashboard |
 
 ### Run Standalone with Docker
 
 ```bash
 docker build -t credit-risk-api .
-docker run -p 8000:8000 -v ./models:/app/models -v ./data:/app/data credit-risk-api
+docker run -p 8001:8001 -v ./models:/app/models -v ./data:/app/data credit-risk-api
 ```
 
 ---

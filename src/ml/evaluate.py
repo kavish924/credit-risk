@@ -1,15 +1,11 @@
-
 import logging
 import sys
 from pathlib import Path
 
 import joblib
 import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
 from sklearn.metrics import (
     ConfusionMatrixDisplay,
-    RocCurveDisplay,
     average_precision_score,
     classification_report,
     confusion_matrix,
@@ -37,12 +33,21 @@ def evaluate(model_path: Path = MODELS_DIR / "best_model.pkl"):
     if not model_path.exists():
         raise FileNotFoundError(f"Model not found: {model_path}. Run train.py first.")
 
-    model = joblib.load(model_path)
+    raw = joblib.load(model_path)
+
+    # The saved artifact is a dict {"model": model, "threshold": threshold}
+    if isinstance(raw, dict) and "model" in raw:
+        model = raw["model"]
+        threshold = raw.get("threshold", 0.5)
+    else:
+        model = raw
+        threshold = 0.5
+
     X_val, y_val = joblib.load(PROCESSED_DIR / "val_processed.pkl")
     feature_names = joblib.load(PROCESSED_DIR / "feature_names.pkl")
 
     y_proba = model.predict_proba(X_val)[:, 1]
-    y_pred = (y_proba >= 0.5).astype(int)
+    y_pred = (y_proba >= threshold).astype(int)
 
     auc = roc_auc_score(y_val, y_proba)
     ap = average_precision_score(y_val, y_proba)
@@ -54,7 +59,6 @@ def evaluate(model_path: Path = MODELS_DIR / "best_model.pkl"):
     print(f"  Avg Precision      : {ap:.4f}")
     print(f"\n{classification_report(y_val, y_pred, zero_division=0)}")
 
-  
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
     fpr, tpr, _ = roc_curve(y_val, y_proba)
@@ -88,8 +92,11 @@ def evaluate(model_path: Path = MODELS_DIR / "best_model.pkl"):
         # Summary plot
         plt.figure(figsize=(12, 7))
         shap.summary_plot(
-            shap_values, X_sample, feature_names=feature_names,
-            show=False, max_display=20,
+            shap_values,
+            X_sample,
+            feature_names=feature_names,
+            show=False,
+            max_display=20,
         )
         shap_path = REPORTS_DIR / "shap_summary.png"
         plt.savefig(shap_path, bbox_inches="tight", dpi=150)

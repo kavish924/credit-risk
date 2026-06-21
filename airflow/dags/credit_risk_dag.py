@@ -1,5 +1,3 @@
-
-
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -8,9 +6,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from airflow import DAG  # type: ignore
-from airflow.operators.python import PythonOperator, ShortCircuitOperator  # type: ignore
-
-
+from airflow.operators.python import PythonOperator  # type: ignore
 
 default_args = {
     "owner": "mlops-team",
@@ -23,11 +19,10 @@ default_args = {
 }
 
 
-
-
 def task_ingest(**context):
     """Load raw data and basic validation."""
-    from src.data.load_data import load_train, load_test
+    from src.data.load_data import load_test, load_train
+
     df_train = load_train()
     df_test = load_test()
     context["ti"].xcom_push(key="train_rows", value=len(df_train))
@@ -37,8 +32,9 @@ def task_ingest(**context):
 
 def task_validate(**context):
     """Run data quality validation. Short-circuits DAG if validation fails."""
-    from src.data.validate import validate_basic, validate_with_ge
     from src.data.load_data import load_train
+    from src.data.validate import validate_basic, validate_with_ge
+
     df = load_train()
     results = validate_basic(df, label="application_train")
     ge_ok = validate_with_ge(df)
@@ -52,13 +48,13 @@ def task_validate(**context):
 def task_preprocess(**context):
     """Run feature engineering and preprocessing pipeline."""
     from src.data.preprocessing import main as run_preprocessing
+
     run_preprocessing()
     print("✅ Preprocessing complete.")
 
 
 def task_train(**context):
     """Train XGBoost + baselines with MLflow tracking."""
-    import argparse
     from src.ml.train import train_all_models
 
     class Args:
@@ -75,20 +71,20 @@ def task_train(**context):
 def task_evaluate(**context):
     """Evaluate best model and generate reports."""
     from src.ml.evaluate import evaluate
+
     metrics = evaluate()
     context["ti"].xcom_push(key="eval_auc", value=metrics["roc_auc"])
 
     # Gate: if AUC < 0.70, raise alert (don't deploy)
     if metrics["roc_auc"] < 0.70:
-        raise ValueError(
-            f"❌ Model AUC {metrics['roc_auc']:.4f} below threshold 0.70 — skipping deployment."
-        )
+        raise ValueError(f"❌ Model AUC {metrics['roc_auc']:.4f} below threshold 0.70 — skipping deployment.")
     print(f"✅ Evaluation passed. ROC-AUC: {metrics['roc_auc']:.4f}")
 
 
 def task_monitor(**context):
     """Run Evidently drift report on latest data."""
-    from monitoring.drift import run_drift_report, check_drift_threshold
+    from monitoring.drift import check_drift_threshold, run_drift_report
+
     report_path = run_drift_report(ref_size=5000, curr_size=1000)
     drift_detected = check_drift_threshold(report_path)
     context["ti"].xcom_push(key="drift_detected", value=drift_detected)
@@ -116,8 +112,6 @@ def task_notify(**context):
     # TODO: integrate with Slack webhook or SMTP
 
 
-
-
 with DAG(
     dag_id="credit_risk_weekly_retrain",
     default_args=default_args,
@@ -126,7 +120,6 @@ with DAG(
     catchup=False,
     tags=["mlops", "credit-risk", "xgboost"],
 ) as dag:
-
     ingest = PythonOperator(
         task_id="ingest",
         python_callable=task_ingest,
@@ -164,5 +157,4 @@ with DAG(
         trigger_rule="all_done",  # Always run notify, even if upstream fails
     )
 
-    
     ingest >> validate >> preprocess >> train >> evaluate >> monitor >> notify

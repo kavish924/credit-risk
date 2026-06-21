@@ -1,21 +1,23 @@
-
-
+import json
 import logging
+import os
+import sys
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from api.model_loader import ModelWrapper, load_model
-from src.data.preprocessing import engineer_features
 from api.schemas import (
     BatchPredictionRequest,
     BatchPredictionResponse,
@@ -23,16 +25,52 @@ from api.schemas import (
     PredictionRequest,
     PredictionResponse,
 )
+from src.data.preprocessing import engineer_features
+
+# ── Structured JSON Logging ──────────────────────────────────────────────────
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
-)
+class JSONFormatter(logging.Formatter):
+    """Outputs log records as single-line JSON for production log aggregation."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        log_entry = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        if record.exc_info and record.exc_info[0] is not None:
+            log_entry["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_entry, default=str)
+
+
+def _configure_logging():
+    """Configure structured JSON logging in production, human-readable in dev."""
+    app_env = os.getenv("APP_ENV", "development")
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+
+    # Remove existing handlers
+    root_logger.handlers.clear()
+
+    handler = logging.StreamHandler(sys.stdout)
+    if app_env == "production":
+        handler.setFormatter(JSONFormatter())
+    else:
+        handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s — %(message)s"))
+    root_logger.addHandler(handler)
+
+
+_configure_logging()
 logger = logging.getLogger(__name__)
 
 _model: ModelWrapper = None
 _start_time: float = time.time()
+
+# ── Rate Limiter ─────────────────────────────────────────────────────────────
+
+limiter = Limiter(key_func=get_remote_address)
 
 
 @asynccontextmanager
@@ -51,7 +89,6 @@ async def lifespan(app: FastAPI):
     logger.info("👋 Shutting down Credit Risk API.")
 
 
-
 app = FastAPI(
     title="Credit Risk Prediction API",
     description=(
@@ -65,10 +102,17 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# Attach rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:8001",
+        "http://127.0.0.1:8001",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -79,8 +123,6 @@ Instrumentator().instrument(app).expose(app)
 # ── Serve Frontend Static Files ──────────────────────────────────────────────
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
-
-
 
 
 def _risk_label(prob: float) -> str:
@@ -114,8 +156,7 @@ def _predict_single(df: pd.DataFrame) -> float:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Prediction failed: {str(e)}",
-        )
-
+        ) from e
 
 
 @app.get("/", include_in_schema=False, response_class=HTMLResponse)
@@ -144,7 +185,8 @@ async def health_check():
 
 
 @app.post("/predict", response_model=PredictionResponse, tags=["Prediction"])
-async def predict(request: PredictionRequest):
+@limiter.limit("30/minute")
+async def predict(payload: PredictionRequest, request: Request):
     """
     Predict loan default probability for a single application.
 
@@ -153,6 +195,8 @@ async def predict(request: PredictionRequest):
     - **risk_label**: LOW / MEDIUM / HIGH
     - **risk_score**: 0–1000 (higher = safer)
     - **model_version**: MLflow model version
+
+    Rate limit: 30 requests per minute per IP.
     """
     if _model is None:
         raise HTTPException(
@@ -160,12 +204,12 @@ async def predict(request: PredictionRequest):
             detail="Model not loaded. Check /health for details.",
         )
 
-    df = _request_to_dataframe(request)
+    df = _request_to_dataframe(payload)
     prob = _predict_single(df)
 
     logger.info(
         f"Prediction: prob={prob:.4f} risk={_risk_label(prob)} | "
-        f"credit={request.AMT_CREDIT} income={request.AMT_INCOME_TOTAL}"
+        f"credit={payload.AMT_CREDIT} income={payload.AMT_INCOME_TOTAL}"
     )
 
     return PredictionResponse(
@@ -178,10 +222,13 @@ async def predict(request: PredictionRequest):
 
 
 @app.post("/predict/batch", response_model=BatchPredictionResponse, tags=["Prediction"])
-async def predict_batch(request: BatchPredictionRequest):
+@limiter.limit("10/minute")
+async def predict_batch(payload: BatchPredictionRequest, request: Request):
     """
     Predict loan default probability for up to 100 applications in a single call.
     More efficient than repeated single-record calls.
+
+    Rate limit: 10 requests per minute per IP.
     """
     if _model is None:
         raise HTTPException(
@@ -192,7 +239,7 @@ async def predict_batch(request: BatchPredictionRequest):
     predictions = []
     probs = []
 
-    for app_req in request.applications:
+    for app_req in payload.applications:
         df = _request_to_dataframe(app_req)
         prob = _predict_single(df)
         probs.append(prob)

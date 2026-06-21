@@ -1,4 +1,3 @@
-
 import argparse
 import logging
 import sys
@@ -23,14 +22,12 @@ REPORTS_DIR = PROJECT_ROOT / "monitoring" / "reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-
 def build_feature_df(X: np.ndarray, feature_names: list, y: pd.Series = None) -> pd.DataFrame:
     """Wrap numpy array back into a named DataFrame."""
     df = pd.DataFrame(X, columns=feature_names)
     if y is not None:
         df["target"] = y.values
     return df
-
 
 
 def run_drift_report(ref_size: int = 5000, curr_size: int = 1000) -> Path:
@@ -58,21 +55,19 @@ def run_drift_report(ref_size: int = 5000, curr_size: int = 1000) -> Path:
     feature_names = joblib.load(PROCESSED_DIR / "feature_names.pkl")
 
     # Build DataFrames
-    ref_df = build_feature_df(
-        X_train[:ref_size], feature_names, y_train.reset_index(drop=True)[:ref_size]
-    )
-    curr_df = build_feature_df(
-        X_val[-curr_size:], feature_names, y_val.reset_index(drop=True)[-curr_size:]
-    )
+    ref_df = build_feature_df(X_train[:ref_size], feature_names, y_train.reset_index(drop=True)[:ref_size])
+    curr_df = build_feature_df(X_val[-curr_size:], feature_names, y_val.reset_index(drop=True)[-curr_size:])
 
     logger.info(f"Reference: {ref_df.shape} | Current: {curr_df.shape}")
     logger.info("Running Evidently drift analysis...")
 
     # Build report with Data Drift + Target Drift
-    report = Report(metrics=[
-        DataDriftPreset(),
-        TargetDriftPreset(),
-    ])
+    report = Report(
+        metrics=[
+            DataDriftPreset(),
+            TargetDriftPreset(),
+        ]
+    )
     report.run(reference_data=ref_df, current_data=curr_df)
 
     # Save HTML report
@@ -97,7 +92,6 @@ def check_drift_threshold(report_path: Path, threshold: float = 0.5) -> bool:
 
     logger.info(f"Drift threshold check: {threshold} — see full report at {report_path}")
     return False  # Replace with real parsing in production
-
 
 
 def parse_args():

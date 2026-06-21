@@ -1,12 +1,8 @@
-
-
 import logging
-import os
 import sys
 from pathlib import Path
 
 import pandas as pd
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -48,9 +44,7 @@ def load_raw(path: Path, label: str = "dataset") -> pd.DataFrame:
         logger.warning(f"Columns absent (expected for test split): {missing_cols}")
 
     if len(df) < MIN_ROWS:
-        logger.warning(
-            f"⚠️  {label} has only {len(df)} rows — expected >= {MIN_ROWS}."
-        )
+        logger.warning(f"⚠️  {label} has only {len(df)} rows — expected >= {MIN_ROWS}.")
 
     target_col = "TARGET"
     if target_col in df.columns:

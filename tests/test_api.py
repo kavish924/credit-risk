@@ -1,5 +1,3 @@
-
-
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -10,7 +8,6 @@ from fastapi.testclient import TestClient
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
-
 
 
 def make_mock_model(prob: float = 0.15):
@@ -28,11 +25,11 @@ def client():
     mock_wrapper.predict_proba.return_value = np.array([0.15])
 
     with patch("api.model_loader.load_model", return_value=mock_wrapper):
-        from api.app import app, _model
         import api.app as app_module
+        from api.app import app
+
         app_module._model = mock_wrapper  # force inject
         yield TestClient(app)
-
 
 
 VALID_PAYLOAD = {
@@ -48,9 +45,7 @@ VALID_PAYLOAD = {
 }
 
 
-
 class TestHealthEndpoint:
-
     def test_health_returns_200(self, client):
         resp = client.get("/health")
         assert resp.status_code == 200
@@ -64,7 +59,6 @@ class TestHealthEndpoint:
 
 
 class TestPredictEndpoint:
-
     def test_predict_returns_200(self, client):
         resp = client.post("/predict", json=VALID_PAYLOAD)
         assert resp.status_code == 200
@@ -108,7 +102,6 @@ class TestPredictEndpoint:
 
 
 class TestBatchPredictEndpoint:
-
     def test_batch_predict_returns_200(self, client):
         resp = client.post("/predict/batch", json={"applications": [VALID_PAYLOAD]})
         assert resp.status_code == 200
@@ -130,7 +123,6 @@ class TestBatchPredictEndpoint:
 
 
 class TestModelInfoEndpoint:
-
     def test_model_info_returns_200(self, client):
         resp = client.get("/model/info")
         assert resp.status_code == 200

@@ -1,5 +1,3 @@
-
-
 import logging
 import sys
 from pathlib import Path
@@ -33,7 +31,6 @@ MISSING_THRESHOLD = 0.50  # drop columns with more than 50% missing values
 MAX_OHE_CARDINALITY = 10
 
 
-
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     Add derived financial features.
@@ -49,21 +46,15 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
 
     # --- 2. Debt-to-income ratio ---------------------------------------------
     if "AMT_CREDIT" in df.columns and "AMT_INCOME_TOTAL" in df.columns:
-        df["DEBT_TO_INCOME"] = (
-            df["AMT_CREDIT"] / df["AMT_INCOME_TOTAL"].replace(0, np.nan)
-        ).fillna(0)
+        df["DEBT_TO_INCOME"] = (df["AMT_CREDIT"] / df["AMT_INCOME_TOTAL"].replace(0, np.nan)).fillna(0)
 
     # --- 3. Annuity-to-income ratio ------------------------------------------
     if "AMT_ANNUITY" in df.columns and "AMT_INCOME_TOTAL" in df.columns:
-        df["ANNUITY_TO_INCOME"] = (
-            df["AMT_ANNUITY"] / df["AMT_INCOME_TOTAL"].replace(0, np.nan)
-        ).fillna(0)
+        df["ANNUITY_TO_INCOME"] = (df["AMT_ANNUITY"] / df["AMT_INCOME_TOTAL"].replace(0, np.nan)).fillna(0)
 
     # --- 4. Credit term (months) ---------------------------------------------
     if "AMT_CREDIT" in df.columns and "AMT_ANNUITY" in df.columns:
-        df["CREDIT_TERM"] = (
-            df["AMT_CREDIT"] / df["AMT_ANNUITY"].replace(0, np.nan)
-        ).fillna(0)
+        df["CREDIT_TERM"] = (df["AMT_CREDIT"] / df["AMT_ANNUITY"].replace(0, np.nan)).fillna(0)
 
     # --- 5. Age in years (DAYS_BIRTH is negative) ----------------------------
     if "DAYS_BIRTH" in df.columns:
@@ -77,23 +68,24 @@ def build_preprocessor(X: pd.DataFrame):
     Build and return an un-fitted sklearn ColumnTransformer for the given DataFrame.
     """
     numeric_cols = X.select_dtypes(include=["int64", "float64"]).columns.tolist()
-    categorical_cols = [
-        c for c in X.select_dtypes(include=["object"]).columns
-        if X[c].nunique() < MAX_OHE_CARDINALITY
-    ]
+    categorical_cols = [c for c in X.select_dtypes(include=["object"]).columns if X[c].nunique() < MAX_OHE_CARDINALITY]
 
     logger.info(f"  Numeric features  : {len(numeric_cols)}")
     logger.info(f"  Categorical (OHE) : {len(categorical_cols)} — {categorical_cols}")
 
-    numeric_transformer = Pipeline([
-        ("imputer", SimpleImputer(strategy="median")),
-        ("scaler", RobustScaler()),
-    ])
+    numeric_transformer = Pipeline(
+        [
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler", RobustScaler()),
+        ]
+    )
 
-    categorical_transformer = Pipeline([
-        ("imputer", SimpleImputer(strategy="most_frequent")),
-        ("ohe", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
-    ])
+    categorical_transformer = Pipeline(
+        [
+            ("imputer", SimpleImputer(strategy="most_frequent")),
+            ("ohe", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+        ]
+    )
 
     preprocessor = ColumnTransformer(
         transformers=[
@@ -112,7 +104,6 @@ def run_preprocessing(
     fit: bool = True,
     preprocessor=None,
 ) -> tuple:
-
     # 1. Drop high-missing columns
     missing_pct = df.isnull().mean()
     cols_to_drop = missing_pct[missing_pct > MISSING_THRESHOLD].index.tolist()
@@ -126,7 +117,7 @@ def run_preprocessing(
     # 3. Separate target
     y = None
     if TARGET_COL in df.columns:
-        y = df[TARGET_COL].reset_index(drop=True)   # ✅ FIX — align with numpy array
+        y = df[TARGET_COL].reset_index(drop=True)  # ✅ FIX — align with numpy array
         df = df.drop(columns=[TARGET_COL])
 
     # 4. Feature engineering
@@ -152,6 +143,7 @@ def run_preprocessing(
 
 def main():
     from sklearn.model_selection import train_test_split
+
     from src.data.load_data import load_train
 
     logger.info("=" * 60)

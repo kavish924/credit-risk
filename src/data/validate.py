@@ -24,9 +24,16 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 REQUIRED_COLUMNS = [
-    "SK_ID_CURR", "TARGET", "AMT_CREDIT", "AMT_INCOME_TOTAL",
-    "DAYS_BIRTH", "DAYS_EMPLOYED", "NAME_CONTRACT_TYPE",
-    "CODE_GENDER", "FLAG_OWN_CAR", "FLAG_OWN_REALTY",
+    "SK_ID_CURR",
+    "TARGET",
+    "AMT_CREDIT",
+    "AMT_INCOME_TOTAL",
+    "DAYS_BIRTH",
+    "DAYS_EMPLOYED",
+    "NAME_CONTRACT_TYPE",
+    "CODE_GENDER",
+    "FLAG_OWN_CAR",
+    "FLAG_OWN_REALTY",
 ]
 
 VALIDATION_RULES = {
@@ -92,6 +99,7 @@ def validate_basic(df: pd.DataFrame, label: str = "dataset") -> dict:
 # Great Expectations validation (optional — degrades gracefully)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def validate_with_ge(df: pd.DataFrame) -> bool:
     """
     Run Great Expectations suite on the DataFrame.
@@ -112,15 +120,11 @@ def validate_with_ge(df: pd.DataFrame) -> bool:
             ge_df.expect_column_values_to_be_between("AMT_INCOME_TOTAL", min_value=0),
             ge_df.expect_column_to_exist("SK_ID_CURR"),
             ge_df.expect_column_values_to_be_unique("SK_ID_CURR"),
-            ge_df.expect_table_row_count_to_be_between(
-                min_value=100_000, max_value=400_000
-            ),
+            ge_df.expect_table_row_count_to_be_between(min_value=100_000, max_value=400_000),
         ]
 
         passed = all(e["success"] for e in expectations)
-        logger.info(
-            f"Great Expectations: {'✅ All checks passed' if passed else '❌ Some checks failed'}"
-        )
+        logger.info(f"Great Expectations: {'✅ All checks passed' if passed else '❌ Some checks failed'}")
         return passed
 
     except ImportError:
@@ -134,6 +138,7 @@ def validate_with_ge(df: pd.DataFrame) -> bool:
 # ─────────────────────────────────────────────────────────────────────────────
 # CLI
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def main():
     from src.data.load_data import load_train
